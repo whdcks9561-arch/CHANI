@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useEffect } from "react";
+import { analyzeFace } from "../services/geminiService";
 
 export default function Camera() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -8,8 +9,12 @@ export default function Camera() {
 
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [isCameraOn, setIsCameraOn] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [result, setResult] = useState<string | null>(null);
 
-  // 📸 카메라 시작 (사용자 클릭 이후)
+  /* =========================
+     📸 카메라 시작 (버튼 클릭)
+     ========================= */
   const startCamera = async () => {
     try {
       if (!navigator.mediaDevices?.getUserMedia) {
@@ -34,13 +39,16 @@ export default function Camera() {
 
       setStream(mediaStream);
       setIsCameraOn(true);
+      setResult(null); // 새 촬영 시 이전 결과 초기화
     } catch (error) {
       console.error("카메라 접근 오류:", error);
-      alert("카메라 접근이 차단되었습니다.\n브라우저 권한 설정을 확인해주세요.");
+      alert("카메라 접근이 차단되었습니다.\n브라우저 권한을 확인해주세요.");
     }
   };
 
-  // 🧯 언마운트 시 카메라 종료
+  /* =========================
+     🧯 컴포넌트 언마운트 시 카메라 종료
+     ========================= */
   useEffect(() => {
     return () => {
       if (stream) {
@@ -49,8 +57,10 @@ export default function Camera() {
     };
   }, [stream]);
 
-  // 📷 사진 캡처
-  const capturePhoto = () => {
+  /* =========================
+     📷 사진 촬영 + 관상 분석
+     ========================= */
+  const capturePhoto = async () => {
     if (!videoRef.current || !canvasRef.current) return;
 
     const video = videoRef.current;
@@ -65,11 +75,23 @@ export default function Camera() {
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
     const imageData = canvas.toDataURL("image/png");
-    // 👉 여기서 imageData를 관상 분석 API로 전달
+
+    setIsAnalyzing(true);
+    setResult(null);
+
+    try {
+      const analysis = await analyzeFace(imageData);
+      setResult(analysis);
+    } catch (error) {
+      console.error(error);
+      setResult("관상 분석에 실패했습니다. 잠시 후 다시 시도해주세요.");
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   return (
-    <div className="flex flex-col items-center gap-6">
+    <div className="flex flex-col items-center gap-6 w-full max-w-md mx-auto p-4">
       {!isCameraOn && (
         <button
           onClick={startCamera}
@@ -79,7 +101,7 @@ export default function Camera() {
         </button>
       )}
 
-      <div className="w-full max-w-md aspect-[3/4] bg-black rounded-xl overflow-hidden">
+      <div className="w-full aspect-[3/4] bg-black rounded-xl overflow-hidden">
         <video
           ref={videoRef}
           autoPlay
@@ -88,13 +110,25 @@ export default function Camera() {
         />
       </div>
 
-      {isCameraOn && (
+      {isCameraOn && !isAnalyzing && (
         <button
           onClick={capturePhoto}
           className="px-6 py-3 bg-blue-600 text-white font-bold rounded-full"
         >
           📷 사진 촬영
         </button>
+      )}
+
+      {isAnalyzing && (
+        <p className="text-sm text-slate-400 mt-2">
+          🔮 관상 분석 중입니다...
+        </p>
+      )}
+
+      {result && (
+        <div className="mt-4 p-4 bg-slate-800 rounded-xl text-sm whitespace-pre-line">
+          {result}
+        </div>
       )}
 
       <canvas ref={canvasRef} className="hidden" />
