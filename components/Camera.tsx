@@ -85,12 +85,13 @@ export default function Camera() {
         className="w-full aspect-[3/4] bg-black rounded-xl overflow-hidden"
         onClick={!isCameraOn ? startCamera : undefined}
       >
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          className="w-full h-full object-cover"
-        />
+<video
+  ref={videoRef}
+  autoPlay
+  playsInline
+  className="w-full h-full object-cover pointer-events-none"
+/>
+
       </div>
 
       {/* 버튼 */}
