@@ -1,99 +1,105 @@
+"use client";
 
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+import { useRef, useState, useEffect } from "react";
 
-interface CameraProps {
-  onCapture: (base64: string) => void;
-}
+export default function Camera() {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
-const Camera: React.FC<CameraProps> = ({ onCapture }) => {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
+  const [isCameraOn, setIsCameraOn] = useState(false);
 
-  useEffect(() => {
-    const startCamera = async () => {
-      try {
-        const constraints = {
-          video: {
-            facingMode: 'user',
-            width: { ideal: 720 },
-            height: { ideal: 1280 }
-          }
-        };
-        const s = await navigator.mediaDevices.getUserMedia(constraints);
-        setStream(s);
-        if (videoRef.current) {
-          videoRef.current.srcObject = s;
-        }
-      } catch (err) {
-        console.error("Camera error:", err);
-        alert("카메라 권한이 필요합니다. 설정에서 카메라 접근을 허용해주세요.");
+  // 📸 카메라 시작 (버튼 클릭 이후에만 실행)
+  const startCamera = async () => {
+    try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        alert("이 브라우저에서는 카메라를 사용할 수 없습니다.");
+        return;
       }
-    };
-    startCamera();
 
+      const mediaStream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: "user",
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
+        audio: false,
+      });
+
+      if (videoRef.current) {
+        videoRef.current.srcObject = mediaStream;
+        videoRef.current.muted = true; // 🔥 iOS 필수
+        await videoRef.current.play();
+      }
+
+      setStream(mediaStream);
+      setIsCameraOn(true);
+    } catch (error) {
+      console.error("카메라 접근 오류:", error);
+      alert("카메라 접근이 차단되었습니다.\n브라우저 권한 설정을 확인해주세요.");
+    }
+  };
+
+  // 🧯 컴포넌트 언마운트 시 카메라 종료
+  useEffect(() => {
     return () => {
       if (stream) {
-        stream.getTracks().forEach(track => track.stop());
+        stream.getTracks().forEach((track) => track.stop());
       }
     };
-  }, []);
+  }, [stream]);
 
-  const capture = useCallback(() => {
-    if (videoRef.current && canvasRef.current) {
-      const video = videoRef.current;
-      const canvas = canvasRef.current;
-      const context = canvas.getContext('2d');
-      if (context) {
-        // 모바일 비율에 맞춰 캔버스 크기 설정
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        
-        // 거울 모드 대응 (전면 카메라일 경우 반전 필요하면 여기서 처리 가능)
-        context.drawImage(video, 0, 0, canvas.width, canvas.height);
-        
-        const base64 = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
-        onCapture(base64);
-      }
-    }
-  }, [onCapture]);
+  // 📷 사진 캡처
+  const capturePhoto = () => {
+    if (!videoRef.current || !canvasRef.current) return;
+
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    const imageData = canvas.toDataURL("image/png");
+    console.log("캡처 이미지:", imageData);
+
+    // 👉 여기서 imageData를 관상 분석 로직으로 전달하면 됨
+  };
 
   return (
-    <div className="relative w-full max-w-md mx-auto aspect-[3/4] bg-slate-900 rounded-[2.5rem] overflow-hidden shadow-2xl border-4 border-amber-400/30">
-      <video
-        ref={videoRef}
-        autoPlay
-        playsInline
-        muted
-        className="w-full h-full object-cover scale-x-[-1]" // 전면 카메라 거울 효과
-      />
-      <canvas ref={canvasRef} className="hidden" />
-      
-      {/* Overlay UI */}
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute inset-0 border-[20px] border-slate-950/40" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[80%] h-[70%] border-2 border-dashed border-amber-400/60 rounded-[100px] shadow-[0_0_50px_rgba(251,191,36,0.2)]" />
+    <div className="flex flex-col items-center gap-6">
+      {!isCameraOn && (
+        <button
+          onClick={startCamera}
+          className="px-6 py-3 bg-amber-500 text-black font-bold rounded-full"
+        >
+          📸 촬영 시작
+        </button>
+      )}
+
+      <div className="w-full max-w-md aspect-[3/4] bg-black rounded-xl overflow-hidden">
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline // 🔥 iOS 필수
+          className="w-full h-full object-cover"
+        />
       </div>
 
-      <div className="absolute bottom-10 left-0 right-0 flex justify-center">
+      {isCameraOn && (
         <button
-          onClick={capture}
-          className="group relative w-20 h-20 flex items-center justify-center active:scale-90 transition-transform"
+          onClick={capturePhoto}
+          className="px-6 py-3 bg-blue-600 text-white font-bold rounded-full"
         >
-          <div className="absolute inset-0 bg-white/20 rounded-full animate-ping group-active:hidden" />
-          <div className="w-16 h-16 bg-white rounded-full border-4 border-slate-200 flex items-center justify-center shadow-2xl">
-            <div className="w-12 h-12 bg-gradient-to-tr from-amber-600 to-amber-400 rounded-full" />
-          </div>
+          📷 사진 촬영
         </button>
-      </div>
-      
-      <div className="absolute top-6 left-0 right-0 text-center">
-        <span className="px-4 py-1.5 bg-slate-950/60 backdrop-blur-md rounded-full text-white text-xs font-bold tracking-widest border border-white/20">
-          얼굴을 중앙에 맞춰주세요
-        </span>
-      </div>
+      )}
+
+      <canvas ref={canvasRef} className="hidden" />
     </div>
   );
-};
-
-export default Camera;
+}
