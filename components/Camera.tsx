@@ -1,7 +1,6 @@
 "use client";
 
 import { useRef, useState, useEffect } from "react";
-import { analyzeFace } from "../services/geminiService";
 
 export default function Camera() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -13,7 +12,7 @@ export default function Camera() {
   const [result, setResult] = useState<string | null>(null);
 
   /* =========================
-     📸 카메라 시작 (버튼 클릭)
+     📸 카메라 시작
      ========================= */
   const startCamera = async () => {
     try {
@@ -39,15 +38,15 @@ export default function Camera() {
 
       setStream(mediaStream);
       setIsCameraOn(true);
-      setResult(null); // 새 촬영 시 이전 결과 초기화
+      setResult(null);
     } catch (error) {
       console.error("카메라 접근 오류:", error);
-      alert("카메라 접근이 차단되었습니다.\n브라우저 권한을 확인해주세요.");
+      alert("카메라 권한을 허용해주세요.");
     }
   };
 
   /* =========================
-     🧯 컴포넌트 언마운트 시 카메라 종료
+     🧯 언마운트 시 카메라 종료
      ========================= */
   useEffect(() => {
     return () => {
@@ -61,7 +60,12 @@ export default function Camera() {
      📷 사진 촬영 + 관상 분석
      ========================= */
   const capturePhoto = async () => {
-    if (!videoRef.current || !canvasRef.current) return;
+    console.log("📸 촬영 버튼 클릭됨");
+
+    if (!videoRef.current || !canvasRef.current) {
+      console.warn("video 또는 canvas 없음");
+      return;
+    }
 
     const video = videoRef.current;
     const canvas = canvasRef.current;
@@ -70,21 +74,30 @@ export default function Camera() {
     canvas.height = video.videoHeight;
 
     const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+    if (!ctx) {
+      console.warn("canvas context 없음");
+      return;
+    }
 
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-    const imageData = canvas.toDataURL("image/png");
+    const imageBase64 = canvas.toDataURL("image/png");
 
     setIsAnalyzing(true);
     setResult(null);
 
     try {
-      const analysis = await analyzeFace(imageData);
-      setResult(analysis);
-    } catch (error) {
-      console.error(error);
-      setResult("관상 분석에 실패했습니다. 잠시 후 다시 시도해주세요.");
+      const res = await fetch("/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageBase64 }),
+      });
+
+      const data = await res.json();
+      setResult(data.result || "분석 결과가 없습니다.");
+    } catch (err) {
+      console.error(err);
+      setResult("관상 분석 중 오류가 발생했습니다.");
     } finally {
       setIsAnalyzing(false);
     }
@@ -94,8 +107,9 @@ export default function Camera() {
     <div className="flex flex-col items-center gap-6 w-full max-w-md mx-auto p-4">
       {!isCameraOn && (
         <button
+          type="button"
           onClick={startCamera}
-          className="px-6 py-3 bg-amber-500 text-black font-bold rounded-full"
+          className="relative z-10 px-6 py-3 bg-amber-500 text-black font-bold rounded-full"
         >
           📸 촬영 시작
         </button>
@@ -110,19 +124,21 @@ export default function Camera() {
         />
       </div>
 
-      {isCameraOn && !isAnalyzing && (
+      {isCameraOn && (
         <button
-          onClick={capturePhoto}
-          className="px-6 py-3 bg-blue-600 text-white font-bold rounded-full"
+          type="button"
+          onClick={() => {
+            alert("사진 촬영 버튼 클릭됨");
+            capturePhoto();
+          }}
+          className="relative z-10 px-6 py-3 bg-blue-600 text-white font-bold rounded-full"
         >
           📷 사진 촬영
         </button>
       )}
 
       {isAnalyzing && (
-        <p className="text-sm text-slate-400 mt-2">
-          🔮 관상 분석 중입니다...
-        </p>
+        <p className="text-sm text-slate-400">🔮 관상 분석 중입니다...</p>
       )}
 
       {result && (
