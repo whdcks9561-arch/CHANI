@@ -9,10 +9,10 @@ export default function Camera() {
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [isCameraOn, setIsCameraOn] = useState(false);
 
-  // 📸 카메라 시작 (버튼 클릭 이후에만 실행)
+  // 📸 카메라 시작 (사용자 클릭 이후)
   const startCamera = async () => {
     try {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      if (!navigator.mediaDevices?.getUserMedia) {
         alert("이 브라우저에서는 카메라를 사용할 수 없습니다.");
         return;
       }
@@ -28,7 +28,7 @@ export default function Camera() {
 
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
-        videoRef.current.muted = true; // 🔥 iOS 필수
+        videoRef.current.muted = true; // iOS 필수
         await videoRef.current.play();
       }
 
@@ -40,7 +40,7 @@ export default function Camera() {
     }
   };
 
-  // 🧯 컴포넌트 언마운트 시 카메라 종료
+  // 🧯 언마운트 시 카메라 종료
   useEffect(() => {
     return () => {
       if (stream) {
@@ -65,9 +65,7 @@ export default function Camera() {
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
     const imageData = canvas.toDataURL("image/png");
-    console.log("캡처 이미지:", imageData);
-
-    // 👉 여기서 imageData를 관상 분석 로직으로 전달하면 됨
+    // 👉 여기서 imageData를 관상 분석 API로 전달
   };
 
   return (
@@ -85,7 +83,7 @@ export default function Camera() {
         <video
           ref={videoRef}
           autoPlay
-          playsInline // 🔥 iOS 필수
+          playsInline
           className="w-full h-full object-cover"
         />
       </div>
