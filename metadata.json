@@ -1,0 +1,7 @@
+{
+  "name": "차니 관상",
+  "description": "얼굴 분석을 통해 당신의 관상을 봐주고 가장 닮은 연예인을 찾아주는 신비로운 AI 서비스입니다.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
