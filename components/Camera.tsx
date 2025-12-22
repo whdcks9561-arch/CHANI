@@ -1,87 +1,84 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 
-type Props = {
-  onResult: (text: string) => void;
-};
-
-export default function Camera({ onResult }: Props) {
+export default function Camera() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  const [loading, setLoading] = useState(false);
+  const [stream, setStream] = useState<MediaStream | null>(null);
+  const [result, setResult] = useState<string>("");
 
   // 카메라 시작
-  useEffect(() => {
-    async function startCamera() {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user" },
-      });
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-      }
+  const startCamera = async () => {
+    const mediaStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "user" },
+      audio: false,
+    });
+
+    if (videoRef.current) {
+      videoRef.current.srcObject = mediaStream;
+      await videoRef.current.play();
     }
 
-    startCamera();
-  }, []);
+    setStream(mediaStream);
+  };
 
   // 사진 촬영 + 분석 요청
-  const capturePhoto = async () => {
+  const captureAndAnalyze = async () => {
     if (!videoRef.current || !canvasRef.current) return;
-
-    console.log("📸 capturePhoto 실행됨");
 
     const video = videoRef.current;
     const canvas = canvasRef.current;
-    const ctx = canvas.getContext("2d");
-
-    if (!ctx) return;
 
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
 
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
 
-    const base64Image = canvas.toDataURL("image/png");
+    ctx.drawImage(video, 0, 0);
+    const image = canvas.toDataURL("image/png");
 
-    try {
-      setLoading(true);
+    console.log("📸 캡처 완료");
 
-      const res = await fetch("/api/analyze", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image: base64Image }),
-      });
+    const res = await fetch("/api/analyze", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ image }),
+    });
 
-      const data = await res.json();
-      onResult(data.result);
-    } catch (e) {
-      alert("분석 중 오류가 발생했습니다.");
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
+    const data = await res.json();
+    setResult(data.result);
   };
 
-  return (
-    <div className="flex flex-col items-center gap-6">
-      <div className="rounded-2xl overflow-hidden">
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          className="w-[320px] h-auto"
-        />
-      </div>
+  useEffect(() => {
+    startCamera();
+    return () => {
+      stream?.getTracks().forEach((t) => t.stop());
+    };
+  }, []);
 
+  return (
+    <div className="flex flex-col items-center gap-4 p-4">
+      <video
+        ref={videoRef}
+        playsInline
+        muted
+        className="rounded-xl w-full max-w-sm"
+      />
       <button
-        onClick={capturePhoto}
-        disabled={loading}
-        className="bg-blue-600 px-6 py-3 rounded-full text-white text-lg disabled:opacity-50"
+        onClick={captureAndAnalyze}
+        className="px-6 py-3 bg-blue-600 text-white rounded-full"
       >
-        {loading ? "분석 중..." : "📸 사진 촬영"}
+        📷 사진 촬영
       </button>
+
+      {result && (
+        <div className="bg-white text-black p-4 rounded-xl whitespace-pre-line">
+          {result}
+        </div>
+      )}
 
       <canvas ref={canvasRef} className="hidden" />
     </div>
