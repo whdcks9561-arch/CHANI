@@ -1,18 +1,13 @@
-import { GoogleGenerativeAI } from "@google/genai";
 import { NextResponse } from "next/server";
+import { GoogleGenerativeAI } from "@google/genai";
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+const genAI = new GoogleGenerativeAI(
+  process.env.GEMINI_API_KEY!
+);
 
 export async function POST(req: Request) {
   try {
-    const { imageBase64 } = await req.json();
-
-    if (!imageBase64) {
-      return NextResponse.json(
-        { error: "이미지가 전달되지 않았습니다." },
-        { status: 400 }
-      );
-    }
+    const { image } = await req.json();
 
     const model = genAI.getGenerativeModel({
       model: "gemini-1.5-flash",
@@ -20,7 +15,7 @@ export async function POST(req: Request) {
 
     const imagePart = {
       inlineData: {
-        data: imageBase64.replace(/^data:image\/\w+;base64,/, ""),
+        data: image.replace(/^data:image\/\w+;base64,/, ""),
         mimeType: "image/png",
       },
     };
@@ -42,10 +37,10 @@ export async function POST(req: Request) {
     return NextResponse.json({
       result: result.response.text(),
     });
-  } catch (error) {
-    console.error(error);
+  } catch (e) {
+    console.error(e);
     return NextResponse.json(
-      { error: "관상 분석 실패" },
+      { error: "분석 실패" },
       { status: 500 }
     );
   }
