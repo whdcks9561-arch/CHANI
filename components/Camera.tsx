@@ -1,128 +1,87 @@
 "use client";
 
-import { useRef, useState, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 
-export default function Camera() {
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+type Props = {
+  onResult: (text: string) => void;
+};
 
-  const [stream, setStream] = useState<MediaStream | null>(null);
-  const [isCameraOn, setIsCameraOn] = useState(false);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [result, setResult] = useState<string | null>(null);
+export default function Camera({ onResult }: Props) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // 📸 카메라 시작
-  const startCamera = async () => {
-    if (isCameraOn) return;
+  const [loading, setLoading] = useState(false);
 
-    try {
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user" },
-        audio: false,
-      });
-
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
-        videoRef.current.muted = true;
-        await videoRef.current.play();
-      }
-
-      setStream(mediaStream);
-      setIsCameraOn(true);
-      setResult(null);
-    } catch (e) {
-      alert("카메라 권한을 허용해주세요.");
-    }
-  };
-
-  // 🧯 종료 시 카메라 끄기
+  // 카메라 시작
   useEffect(() => {
-    return () => {
-      stream?.getTracks().forEach((t) => t.stop());
-    };
-  }, [stream]);
+    async function startCamera() {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "user" },
+      });
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+    }
 
-  // 📷 사진 촬영 + 분석
+    startCamera();
+  }, []);
+
+  // 사진 촬영 + 분석 요청
   const capturePhoto = async () => {
-    console.log("📸 캡처 실행");
-
     if (!videoRef.current || !canvasRef.current) return;
+
+    console.log("📸 capturePhoto 실행됨");
 
     const video = videoRef.current;
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
+
     if (!ctx) return;
 
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
-    ctx.drawImage(video, 0, 0);
 
-    const imageBase64 = canvas.toDataURL("image/png");
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-    setIsAnalyzing(true);
-    setResult(null);
+    const base64Image = canvas.toDataURL("image/png");
 
     try {
+      setLoading(true);
+
       const res = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ imageBase64 }),
+        body: JSON.stringify({ image: base64Image }),
       });
 
       const data = await res.json();
-      setResult(data.result ?? "분석 결과 없음");
-    } catch {
-      setResult("관상 분석 실패");
+      onResult(data.result);
+    } catch (e) {
+      alert("분석 중 오류가 발생했습니다.");
+      console.error(e);
     } finally {
-      setIsAnalyzing(false);
+      setLoading(false);
     }
   };
 
   return (
-    <div className="flex flex-col items-center gap-6 w-full max-w-md mx-auto p-4">
-      {/* 카메라 화면 */}
-      <div
-        className="w-full aspect-[3/4] bg-black rounded-xl overflow-hidden"
-        onClick={!isCameraOn ? startCamera : undefined}
-      >
-<video
-  ref={videoRef}
-  autoPlay
-  playsInline
-  className="w-full h-full object-cover pointer-events-none"
-/>
-
+    <div className="flex flex-col items-center gap-6">
+      <div className="rounded-2xl overflow-hidden">
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          className="w-[320px] h-auto"
+        />
       </div>
 
-      {/* 버튼 */}
-      {!isCameraOn ? (
-        <button
-          type="button"
-          onClick={startCamera}
-          className="z-10 px-6 py-3 bg-amber-500 text-black font-bold rounded-full"
-        >
-          📸 촬영 시작
-        </button>
-      ) : (
-        <button
-          type="button"
-          onClick={capturePhoto}
-          className="z-10 px-6 py-3 bg-blue-600 text-white font-bold rounded-full"
-        >
-          📷 사진 촬영
-        </button>
-      )}
-
-      {/* 상태 */}
-      {isAnalyzing && (
-        <p className="text-sm text-slate-400">🔮 관상 분석 중...</p>
-      )}
-
-      {result && (
-        <div className="mt-4 p-4 bg-slate-800 rounded-xl text-sm whitespace-pre-line">
-          {result}
-        </div>
-      )}
+      <button
+        onClick={capturePhoto}
+        disabled={loading}
+        className="bg-blue-600 px-6 py-3 rounded-full text-white text-lg disabled:opacity-50"
+      >
+        {loading ? "분석 중..." : "📸 사진 촬영"}
+      </button>
 
       <canvas ref={canvasRef} className="hidden" />
     </div>
