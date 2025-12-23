@@ -22,6 +22,11 @@ export async function POST(req: Request) {
       );
     }
 
+    // ⭐ 핵심: base64 prefix 제거
+    const base64Data = image.includes(",")
+      ? image.split(",")[1]
+      : image;
+
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({
       model: "gemini-1.5-flash",
@@ -31,7 +36,7 @@ export async function POST(req: Request) {
       {
         inlineData: {
           mimeType: "image/jpeg",
-          data: image,
+          data: base64Data,
         },
       },
       {
@@ -39,9 +44,9 @@ export async function POST(req: Request) {
       },
     ]);
 
-    const response = result.response.text();
-
-    return NextResponse.json({ result: response });
+    return NextResponse.json({
+      result: result.response.text(),
+    });
   } catch (err) {
     console.error("Analyze API error:", err);
     return NextResponse.json(
