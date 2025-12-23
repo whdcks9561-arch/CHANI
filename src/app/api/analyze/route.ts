@@ -1,18 +1,9 @@
 import { NextResponse } from "next/server";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 
 export const runtime = "nodejs";
 
 export async function POST(req: Request) {
   try {
-    const contentType = req.headers.get("content-type") || "";
-    if (!contentType.includes("multipart/form-data")) {
-      return NextResponse.json(
-        { error: "Invalid Content-Type" },
-        { status: 400 }
-      );
-    }
-
     const formData = await req.formData();
     const file = formData.get("image") as File | null;
 
@@ -26,30 +17,60 @@ export async function POST(req: Request) {
     const buffer = Buffer.from(await file.arrayBuffer());
     const base64Image = buffer.toString("base64");
 
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return NextResponse.json(
+        { error: "GEMINI_API_KEY is missing" },
+        { status: 500 }
+      );
+    }
 
-    // ✅ v1beta에서 실제로 존재하는 모델 이름
-    const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash",
-    });
-
-    const result = await model.generateContent([
+    // ✅ REST v1 endpoint (중요)
+    const res = await fetch(
+      "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=" +
+        apiKey,
       {
-        inlineData: {
-          data: base64Image,
-          mimeType: file.type,
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
-      },
-      {
-        text: "이 사진을 관상 관점에서 분석해줘. 한국어로 부드럽게 설명해줘.",
-      },
-    ]);
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                {
+                  text:
+                    "이 사진을 관상 관점에서 분석해줘. " +
+                    "한국어로 부드럽고 긍정적으로 설명해줘.",
+                },
+                {
+                  inlineData: {
+                    mimeType: file.type,
+                    data: base64Image,
+                  },
+                },
+              ],
+            },
+          ],
+        }),
+      }
+    );
+
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error("Gemini REST error:", errText);
+      return NextResponse.json(
+        { error: "Gemini API 호출 실패" },
+        { status: 500 }
+      );
+    }
+
+    const json = await res.json();
 
     const text =
-      result.response.candidates?.[0]?.content?.parts
-        ?.map((p) => p.text)
-        .join("") ??
-      "분석 결과를 생성하지 못했습니다.";
+      json.candidates?.[0]?.content?.parts
+        ?.map((p: any) => p.text)
+        .join("") ?? "분석 결과가 없습니다.";
 
     return NextResponse.json({ result: text });
   } catch (error) {
