@@ -28,12 +28,11 @@ export async function POST(req: NextRequest) {
       process.env.GEMINI_API_KEY!
     );
 
-    // ✅ vision-safe 모델
+    // ✅ 핵심 수정: vision 지원 모델
     const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash",
+      model: "gemini-1.0-pro-vision",
     });
 
-    // ✅ 텍스트 → 이미지 순서 (중요)
     const result = await model.generateContent([
       {
         text: "이 사진을 관상 관점에서 분석해줘",
