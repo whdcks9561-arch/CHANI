@@ -28,9 +28,9 @@ export async function POST(req: Request) {
 
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
-    // ✅ v1beta + Vision에서 확실히 동작하는 모델
+    // ✅ v1beta에서 이미지 입력이 되는 유일한 안정 모델
     const model = genAI.getGenerativeModel({
-      model: "models/gemini-1.5-pro-vision-latest",
+      model: "models/gemini-1.5-flash-latest",
     });
 
     const result = await model.generateContent([
@@ -41,12 +41,14 @@ export async function POST(req: Request) {
         },
       },
       {
-        text: "이 사진을 관상 관점에서 분석해줘. 말투는 부드럽고 한국어로 설명해줘.",
+        text: "이 사진을 관상 관점에서 분석해줘. 한국어로 부드럽게 설명해줘.",
       },
     ]);
 
     const text =
-      result.response.candidates?.[0]?.content?.parts?.[0]?.text ??
+      result.response.candidates?.[0]?.content?.parts
+        ?.map((p) => p.text)
+        .join("") ??
       "분석 결과를 생성하지 못했습니다.";
 
     return NextResponse.json({ result: text });
