@@ -1,5 +1,3 @@
-console.log("🔥🔥 이 Camera.tsx가 로드됨");
-
 "use client";
 
 import { useRef, useState, useEffect } from "react";
@@ -69,17 +67,13 @@ export default function Camera() {
         muted
         className="rounded-xl w-full max-w-sm"
       />
-<button
-  onClick={() => {
-    alert("🔥 이 Camera.tsx 맞다");
-    console.log("🔥 클릭됨");
-  }}
-  className="px-6 py-3 bg-red-600 text-white rounded-full"
->
-  📷 사진 촬영
-</button>
 
-
+      <button
+        onClick={captureAndAnalyze}
+        className="px-6 py-3 bg-blue-600 text-white rounded-full"
+      >
+        📷 사진 촬영
+      </button>
 
       {result && (
         <div className="bg-white text-black p-4 rounded-xl whitespace-pre-line">
