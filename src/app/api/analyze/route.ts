@@ -25,9 +25,9 @@ export async function POST(req: Request) {
       );
     }
 
-    // ✅ REST v1 endpoint (중요)
+    // ✅ v1beta + 안정 모델
     const res = await fetch(
-      "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=" +
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.0-pro-vision:generateContent?key=" +
         apiKey,
       {
         method: "POST",
@@ -57,8 +57,8 @@ export async function POST(req: Request) {
     );
 
     if (!res.ok) {
-      const errText = await res.text();
-      console.error("Gemini REST error:", errText);
+      const err = await res.text();
+      console.error("Gemini REST error:", err);
       return NextResponse.json(
         { error: "Gemini API 호출 실패" },
         { status: 500 }
