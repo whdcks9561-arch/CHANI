@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
+export const runtime = "nodejs"; // ⭐ 중요 (edge 아님)
+
 export async function POST(req: Request) {
   try {
-    const { image } = await req.json();
+    const body = await req.json();
+    const image = body.image;
 
     if (!image) {
       return NextResponse.json(
@@ -14,10 +17,7 @@ export async function POST(req: Request) {
 
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      return NextResponse.json(
-        { error: "GEMINI_API_KEY is not set" },
-        { status: 500 }
-      );
+      throw new Error("GEMINI_API_KEY is missing");
     }
 
     // base64 헤더 제거
@@ -62,10 +62,13 @@ export async function POST(req: Request) {
     return NextResponse.json({
       result: result.response.text(),
     });
-  } catch (err: any) {
-    console.error("🔥 analyze error", err);
+  } catch (error: any) {
+    console.error("🔥 analyze error:", error);
+
     return NextResponse.json(
-      { error: err.message ?? "Internal Server Error" },
+      {
+        error: error?.message ?? "Internal Server Error",
+      },
       { status: 500 }
     );
   }
