@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
 
     // ✅ 핵심 수정: vision 지원 모델
     const model = genAI.getGenerativeModel({
-      model: "gemini-1.0-pro-vision",
+      model: "models/gemini-pro",
     });
 
     const result = await model.generateContent([
