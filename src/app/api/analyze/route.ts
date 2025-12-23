@@ -1,47 +1,47 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 export const runtime = "nodejs";
 
-export async function POST(req: NextRequest) {
+export async function POST(req: Request) {
   try {
+    const contentType = req.headers.get("content-type") || "";
+    if (!contentType.includes("multipart/form-data")) {
+      return NextResponse.json(
+        { error: "Invalid Content-Type" },
+        { status: 400 }
+      );
+    }
+
     const formData = await req.formData();
-    const image = formData.get("image");
+    const file = formData.get("image") as File | null;
 
-    if (!(image instanceof File)) {
+    if (!file) {
       return NextResponse.json(
-        { error: "이미지 파일이 전달되지 않았습니다." },
+        { error: "No image provided" },
         { status: 400 }
       );
     }
 
-    if (!image.type.startsWith("image/")) {
-      return NextResponse.json(
-        { error: "이미지 파일만 업로드 가능합니다." },
-        { status: 400 }
-      );
-    }
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const base64Image = buffer.toString("base64");
 
-    const buffer = Buffer.from(await image.arrayBuffer());
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
-    const genAI = new GoogleGenerativeAI(
-      process.env.GEMINI_API_KEY!
-    );
-
-    // ✅ 핵심 수정: vision 지원 모델
+    // ✅ v1beta + Vision에서 확실히 동작하는 모델
     const model = genAI.getGenerativeModel({
-      model: "models/gemini-pro",
+      model: "models/gemini-1.5-pro-vision-latest",
     });
 
     const result = await model.generateContent([
       {
-        text: "이 사진을 관상 관점에서 분석해줘",
+        inlineData: {
+          data: base64Image,
+          mimeType: file.type,
+        },
       },
       {
-        inlineData: {
-          mimeType: image.type,
-          data: buffer.toString("base64"),
-        },
+        text: "이 사진을 관상 관점에서 분석해줘. 말투는 부드럽고 한국어로 설명해줘.",
       },
     ]);
 
@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error("Analyze API error:", error);
     return NextResponse.json(
-      { error: "서버 내부 오류" },
+      { error: "서버 오류 (분석 실패)" },
       { status: 500 }
     );
   }
