@@ -1,72 +1,82 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 
 export const runtime = "nodejs";
 
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+
 export async function POST(req: NextRequest) {
   try {
-    // 1️⃣ FormData 파싱
+    if (!GEMINI_API_KEY) {
+      return NextResponse.json(
+        { error: "GEMINI_API_KEY is not set" },
+        { status: 500 }
+      );
+    }
+
     const formData = await req.formData();
     const imageFile = formData.get("image") as File | null;
 
     if (!imageFile) {
       return NextResponse.json(
-        { error: "이미지 파일이 없습니다." },
+        { error: "No image provided" },
         { status: 400 }
       );
     }
 
-    // 2️⃣ 이미지 → base64
     const buffer = Buffer.from(await imageFile.arrayBuffer());
     const base64Image = buffer.toString("base64");
 
-    // 3️⃣ API 키
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      throw new Error("GEMINI_API_KEY 환경변수가 없습니다.");
+    /**
+     * ✅ Gemini REST v1
+     * ✅ 현재 실제 사용 가능한 모델
+     */
+    const endpoint =
+      `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            role: "user",
+            parts: [
+              {
+                text: "이 사람의 얼굴을 관상 관점에서 분석해줘. 성격, 첫인상, 장단점을 중심으로 설명해줘.",
+              },
+              {
+                inlineData: {
+                  mimeType: "image/png",
+                  data: base64Image,
+                },
+              },
+            ],
+          },
+        ],
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error("Gemini REST error:", data);
+      return NextResponse.json(
+        { error: "Gemini API error", detail: data },
+        { status: 500 }
+      );
     }
 
-    // 4️⃣ Gemini SDK 초기화
-    const genAI = new GoogleGenerativeAI(apiKey);
+    const result =
+      data.candidates?.[0]?.content?.parts?.[0]?.text ??
+      "분석 결과를 가져오지 못했습니다.";
 
-    // ✅ 가장 안정적이고 항상 열려 있는 모델
-    const model = genAI.getGenerativeModel({
-      model: "gemini-1.0-pro",
-    });
-
-    // 5️⃣ 요청 (텍스트 + 이미지)
-    const result = await model.generateContent([
-      {
-        text: `
-이 사람의 얼굴을 관상 관점에서 분석해줘.
-
-다음 항목을 포함해줘:
-1. 첫인상
-2. 성격적 특징
-3. 장점
-4. 단점
-5. 인간관계 스타일
-
-관상 해석임을 전제로 부드럽고 긍정적으로 설명해줘.
-        `.trim(),
-      },
-      {
-        inlineData: {
-          mimeType: imageFile.type || "image/png",
-          data: base64Image,
-        },
-      },
-    ]);
-
-    // 6️⃣ 결과 반환
-    return NextResponse.json({
-      result: result.response.text(),
-    });
-  } catch (error) {
-    console.error("Analyze API error:", error);
-
+    return NextResponse.json({ result });
+  } catch (err) {
+    console.error("Analyze API error:", err);
     return NextResponse.json(
-      { error: "분석 중 서버 오류가 발생했습니다." },
+      { error: "Internal Server Error" },
       { status: 500 }
     );
   }
