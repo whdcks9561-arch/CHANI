@@ -68,11 +68,15 @@ export default function Camera() {
         className="rounded-xl w-full max-w-sm"
       />
 <button
-  onClick={() => alert("이 Camera.tsx가 실행 중")}
+  onClick={() => {
+    alert("🔥 이 Camera.tsx 맞다");
+    console.log("🔥 클릭됨");
+  }}
   className="px-6 py-3 bg-red-600 text-white rounded-full"
 >
   📷 사진 촬영
 </button>
+
 
 
       {result && (
