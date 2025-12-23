@@ -1,3 +1,5 @@
+console.log("🔥🔥 이 Camera.tsx가 로드됨");
+
 "use client";
 
 import { useRef, useState, useEffect } from "react";
