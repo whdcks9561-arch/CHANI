@@ -8,7 +8,7 @@ export async function POST(req: NextRequest) {
   try {
     if (!GEMINI_API_KEY) {
       return NextResponse.json(
-        { error: "GEMINI_API_KEY is not set" },
+        { error: "GEMINI_API_KEY is missing" },
         { status: 500 }
       );
     }
@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
 
     if (!imageFile) {
       return NextResponse.json(
-        { error: "No image provided" },
+        { error: "No image file provided" },
         { status: 400 }
       );
     }
@@ -26,11 +26,9 @@ export async function POST(req: NextRequest) {
     const buffer = Buffer.from(await imageFile.arrayBuffer());
     const base64Image = buffer.toString("base64");
 
-    /**
-     * ✅ 2025년 기준 유효한 모델
-     */
+    // ✅ 2025년 유효한 Gemini 모델
     const endpoint =
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-002:generateContent?key=${GEMINI_API_KEY}`;
+      `https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
 
     const response = await fetch(endpoint, {
       method: "POST",
@@ -43,7 +41,7 @@ export async function POST(req: NextRequest) {
             role: "user",
             parts: [
               {
-                text: "이 사람의 얼굴을 관상 관점에서 분석해줘. 성격, 첫인상, 장단점을 중심으로 설명해줘.",
+                text: "이 사람의 얼굴을 관상 관점에서 분석해줘. 성격, 첫인상, 장단점 위주로 설명해줘.",
               },
               {
                 inlineData: {
