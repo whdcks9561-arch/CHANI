@@ -1,11 +1,17 @@
 import { NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
+/**
+ * 🚨 중요
+ * Gemini SDK는 Edge Runtime에서 동작하지 않음
+ * 반드시 Node.js Runtime으로 고정
+ */
 export const runtime = "nodejs";
 
 export async function POST(req: Request) {
   try {
-    const { image } = await req.json();
+    const body = await req.json();
+    const image = body.image;
 
     if (!image) {
       return NextResponse.json(
@@ -19,7 +25,7 @@ export async function POST(req: Request) {
       throw new Error("GEMINI_API_KEY is missing");
     }
 
-    // base64 헤더 제거
+    // base64 prefix 제거
     const base64Image = image.replace(
       /^data:image\/\w+;base64,/,
       ""
@@ -27,7 +33,7 @@ export async function POST(req: Request) {
 
     const genAI = new GoogleGenerativeAI(apiKey);
 
-    const result = await genAI.models.generateContent({
+    const response = await genAI.models.generateContent({
       model: "gemini-1.5-flash",
       contents: [
         {
@@ -46,14 +52,14 @@ export async function POST(req: Request) {
     });
 
     return NextResponse.json({
-      result: result.text,
+      result: response.text,
     });
-  } catch (error: any) {
-    console.error("🔥 analyze error:", error);
+  } catch (err: any) {
+    console.error("🔥 Gemini analyze error:", err);
 
     return NextResponse.json(
       {
-        error: error?.message ?? "Internal Server Error",
+        error: err?.message ?? "Internal Server Error",
       },
       { status: 500 }
     );
