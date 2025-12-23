@@ -27,11 +27,12 @@ export async function POST(req: NextRequest) {
     const base64Image = buffer.toString("base64");
 
     /**
-     * ✅ Gemini REST v1
-     * ✅ 현재 실제 사용 가능한 모델
+     * ✅ 핵심 포인트
+     * - v1beta 사용
+     * - flash 모델은 v1에서 ❌
      */
     const endpoint =
-      `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
 
     const response = await fetch(endpoint, {
       method: "POST",
