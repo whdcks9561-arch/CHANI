@@ -1,56 +1,60 @@
-export const runtime = "nodejs";
-
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-export async function POST(req: Request) {
-  try {
-    const { image } = await req.json();
+export const runtime = "nodejs";
 
-    if (!image) {
+export async function POST(req: NextRequest) {
+  try {
+    const formData = await req.formData();
+    const image = formData.get("image");
+
+    if (!(image instanceof File)) {
       return NextResponse.json(
-        { error: "image is required" },
+        { error: "이미지 파일이 전달되지 않았습니다." },
         { status: 400 }
       );
     }
 
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
+    if (!image.type.startsWith("image/")) {
       return NextResponse.json(
-        { error: "GEMINI_API_KEY is not set" },
-        { status: 500 }
+        { error: "이미지 파일만 업로드 가능합니다." },
+        { status: 400 }
       );
     }
 
-    // ⭐ 핵심: base64 prefix 제거
-    const base64Data = image.includes(",")
-      ? image.split(",")[1]
-      : image;
+    const buffer = Buffer.from(await image.arrayBuffer());
 
-    const genAI = new GoogleGenerativeAI(apiKey);
+    const genAI = new GoogleGenerativeAI(
+      process.env.GEMINI_API_KEY!
+    );
+
+    // ✅ vision-safe 모델
     const model = genAI.getGenerativeModel({
       model: "gemini-1.5-flash",
     });
 
+    // ✅ 텍스트 → 이미지 순서 (중요)
     const result = await model.generateContent([
-      {
-        inlineData: {
-          mimeType: "image/jpeg",
-          data: base64Data,
-        },
-      },
       {
         text: "이 사진을 관상 관점에서 분석해줘",
       },
+      {
+        inlineData: {
+          mimeType: image.type,
+          data: buffer.toString("base64"),
+        },
+      },
     ]);
 
-    return NextResponse.json({
-      result: result.response.text(),
-    });
-  } catch (err) {
-    console.error("Analyze API error:", err);
+    const text =
+      result.response.candidates?.[0]?.content?.parts?.[0]?.text ??
+      "분석 결과를 생성하지 못했습니다.";
+
+    return NextResponse.json({ result: text });
+  } catch (error) {
+    console.error("Analyze API error:", error);
     return NextResponse.json(
-      { error: "서버 오류 (500)" },
+      { error: "서버 내부 오류" },
       { status: 500 }
     );
   }
