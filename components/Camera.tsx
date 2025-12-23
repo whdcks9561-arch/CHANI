@@ -1,135 +1,115 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 
 export default function Camera() {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [loading, setLoading] = useState(false);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  const [stream, setStream] = useState<MediaStream | null>(null);
   const [result, setResult] = useState<string>("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string>("");
 
   // 카메라 시작
-  useEffect(() => {
-    async function startCamera() {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "user" },
-        });
+  const startCamera = async () => {
+    try {
+      const mediaStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "user" },
+        audio: false,
+      });
 
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-        }
-      } catch (err) {
-        console.error("카메라 접근 실패:", err);
+      if (videoRef.current) {
+        videoRef.current.srcObject = mediaStream;
+        await videoRef.current.play();
       }
+
+      setStream(mediaStream);
+    } catch (err) {
+      console.error("카메라 접근 실패", err);
+      setError("카메라를 사용할 수 없습니다.");
     }
+  };
 
-    startCamera();
-  }, []);
-
-  // 사진 촬영 + 리사이즈 + API 전송
-  const captureImage = async () => {
-    if (!videoRef.current) return;
+  // 사진 촬영 + 서버 전송
+  const captureAndAnalyze = async () => {
+    if (!videoRef.current || !canvasRef.current) return;
 
     setLoading(true);
+    setError("");
     setResult("");
 
-    const video = videoRef.current;
-
-    // ✅ Gemini 500 방지용 리사이즈
-    const MAX_WIDTH = 640;
-    const scale = MAX_WIDTH / video.videoWidth;
-
-    const canvas = document.createElement("canvas");
-    canvas.width = MAX_WIDTH;
-    canvas.height = video.videoHeight * scale;
-
-    const ctx = canvas.getContext("2d");
-    if (!ctx) {
-      setLoading(false);
-      return;
-    }
-
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-    // ✅ JPEG + 압축 (중요)
-    const imageData = canvas.toDataURL("image/jpeg", 0.8);
-
     try {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+
+      ctx.drawImage(video, 0, 0);
+      const image = canvas.toDataURL("image/png");
+
       const res = await fetch("/api/analyze", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ image: imageData }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image }),
       });
 
       if (!res.ok) {
-        throw new Error(`API 오류: ${res.status}`);
+        throw new Error(`서버 오류 (${res.status})`);
       }
 
       const data = await res.json();
-      setResult(data.result || "분석 결과가 없습니다.");
+      setResult(data.result ?? "결과가 없습니다.");
     } catch (err: any) {
-      console.error("분석 실패:", err);
-      setResult("분석 중 오류가 발생했습니다.");
+      console.error(err);
+      setError("분석 중 오류가 발생했습니다.");
     } finally {
       setLoading(false);
     }
   };
 
+  useEffect(() => {
+    startCamera();
+    return () => {
+      stream?.getTracks().forEach((t) => t.stop());
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
-    <div
-      style={{
-        maxWidth: 420,
-        margin: "0 auto",
-        padding: 16,
-        textAlign: "center",
-      }}
-    >
+    <div className="flex flex-col items-center gap-4 p-4">
       <video
         ref={videoRef}
-        autoPlay
         playsInline
         muted
-        style={{
-          width: "100%",
-          borderRadius: 12,
-          background: "#000",
-        }}
+        className="rounded-xl w-full max-w-sm bg-black"
       />
 
       <button
-        onClick={captureImage}
+        onClick={captureAndAnalyze}
         disabled={loading}
-        style={{
-          marginTop: 12,
-          padding: "12px 20px",
-          fontSize: 16,
-          borderRadius: 999,
-          border: "none",
-          background: loading ? "#888" : "#2563eb",
-          color: "#fff",
-          cursor: loading ? "not-allowed" : "pointer",
-        }}
+        className="px-6 py-3 bg-blue-600 text-white rounded-full disabled:opacity-50"
       >
-        {loading ? "분석 중..." : "사진 촬영"}
+        {loading ? "분석 중..." : "📷 사진 촬영"}
       </button>
 
+      {error && (
+        <div className="text-red-500 text-sm">
+          {error}
+        </div>
+      )}
+
       {result && (
-        <div
-          style={{
-            marginTop: 16,
-            padding: 12,
-            background: "#f1f5f9",
-            borderRadius: 8,
-            whiteSpace: "pre-wrap",
-            textAlign: "left",
-            fontSize: 14,
-          }}
-        >
+        <div className="bg-white text-black p-4 rounded-xl whitespace-pre-line max-w-sm">
           {result}
         </div>
       )}
+
+      <canvas ref={canvasRef} className="hidden" />
     </div>
   );
 }
