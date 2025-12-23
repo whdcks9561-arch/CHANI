@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-export const runtime = "nodejs"; // ⭐ 반드시 nodejs
+export const runtime = "nodejs";
 
 export async function POST(req: Request) {
   try {
@@ -19,7 +19,7 @@ export async function POST(req: Request) {
       throw new Error("GEMINI_API_KEY is missing");
     }
 
-    // base64 prefix 제거
+    // base64 헤더 제거
     const base64Image = image.replace(
       /^data:image\/\w+;base64,/,
       ""
@@ -27,11 +27,8 @@ export async function POST(req: Request) {
 
     const genAI = new GoogleGenerativeAI(apiKey);
 
-    const model = genAI.getGenerativeModel({
+    const result = await genAI.models.generateContent({
       model: "gemini-1.5-flash",
-    });
-
-    const result = await model.generateContent({
       contents: [
         {
           role: "user",
@@ -49,7 +46,7 @@ export async function POST(req: Request) {
     });
 
     return NextResponse.json({
-      result: result.response.text(),
+      result: result.text,
     });
   } catch (error: any) {
     console.error("🔥 analyze error:", error);
