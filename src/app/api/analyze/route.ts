@@ -1,3 +1,5 @@
+export const runtime = "nodejs";
+
 import { NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
 
@@ -18,8 +20,6 @@ export async function POST(req: Request) {
       apiKey: process.env.GEMINI_API_KEY!,
     });
 
-    // ✅ getGenerativeModel ❌
-    // ✅ models.generateContent ✅
     const result = await genAI.models.generateContent({
       model: "gemini-1.5-flash",
       contents: [
