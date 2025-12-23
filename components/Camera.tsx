@@ -32,45 +32,58 @@ export default function Camera() {
   };
 
   // 사진 촬영 + 서버 전송
-  const captureAndAnalyze = async () => {
-    if (!videoRef.current || !canvasRef.current) return;
+const captureAndAnalyze = async () => {
+  if (!videoRef.current || !canvasRef.current) return;
 
-    setLoading(true);
-    setError("");
-    setResult("");
+  setLoading(true);
+  setError("");
+  setResult("");
 
-    try {
-      const video = videoRef.current;
-      const canvas = canvasRef.current;
+  try {
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
 
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
 
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
 
-      ctx.drawImage(video, 0, 0);
-      const image = canvas.toDataURL("image/png");
+    ctx.drawImage(video, 0, 0);
 
-      const res = await fetch("/api/analyze", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image }),
-      });
+    // canvas → Blob
+    const blob: Blob | null = await new Promise((resolve) =>
+      canvas.toBlob(resolve, "image/png")
+    );
 
-      if (!res.ok) {
-        throw new Error(`서버 오류 (${res.status})`);
-      }
-
-      const data = await res.json();
-      setResult(data.result ?? "결과가 없습니다.");
-    } catch (err: any) {
-      console.error(err);
-      setError("분석 중 오류가 발생했습니다.");
-    } finally {
-      setLoading(false);
+    if (!blob) {
+      throw new Error("이미지 생성 실패");
     }
-  };
+
+    // ✅ FormData 생성
+    const formData = new FormData();
+    formData.append("image", blob, "capture.png");
+
+    // ❗ Content-Type 헤더 직접 지정 ❌ (브라우저가 자동 설정)
+    const res = await fetch("/api/analyze", {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!res.ok) {
+      throw new Error(`서버 오류 (${res.status})`);
+    }
+
+    const data = await res.json();
+    setResult(data.result ?? "결과가 없습니다.");
+  } catch (err) {
+    console.error(err);
+    setError("분석 중 오류가 발생했습니다.");
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   useEffect(() => {
     startCamera();
