@@ -1,48 +1,52 @@
-export const runtime = "nodejs";
-
 import { NextResponse } from "next/server";
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 export async function POST(req: Request) {
   try {
     const { image } = await req.json();
 
     if (!image) {
-      return NextResponse.json({ error: "No image" }, { status: 400 });
+      return NextResponse.json(
+        { error: "No image provided" },
+        { status: 400 }
+      );
     }
 
+    // base64 헤더 제거
     const base64Image = image.replace(/^data:image\/\w+;base64,/, "");
 
-    const genAI = new GoogleGenAI({
-      apiKey: process.env.GEMINI_API_KEY!,
+    const genAI = new GoogleGenerativeAI(
+      process.env.GEMINI_API_KEY!
+    );
+
+    const model = genAI.getGenerativeModel({
+      model: "gemini-1.5-flash",
     });
 
-    const response = await genAI.models.generateContent({
-      model: "gemini-1.5-pro",
-      contents: [
-        {
-          role: "user",
-          parts: [
-            { text: "이 사진을 관상 관점에서 재미로 분석해줘." },
-            {
-              inlineData: {
-                mimeType: "image/jpeg",
-                data: base64Image,
-              },
+    const result = await model.generateContent([
+      {
+        role: "user",
+        parts: [
+          { text: "이 사진을 관상 관점에서 분석해줘" },
+          {
+            inlineData: {
+              mimeType: "image/jpeg",
+              data: base64Image,
             },
-          ],
-        },
-      ],
+          },
+        ],
+      },
+    ]);
+
+    return NextResponse.json({
+      result: result.response.text(),
     });
+  } catch (error: any) {
+    console.error("🔥 analyze error:", error);
 
-    const text =
-      response.candidates?.[0]?.content?.parts
-        ?.map((p: any) => p.text)
-        .join("") ?? "분석 실패";
-
-    return NextResponse.json({ result: text });
-  } catch (e: any) {
-    console.error("🔥 GEMINI ERROR:", e);
-    return NextResponse.json({ error: e.message }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message ?? "Internal Server Error" },
+      { status: 500 }
+    );
   }
 }
