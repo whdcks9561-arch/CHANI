@@ -28,9 +28,9 @@ export async function POST(req: Request) {
 
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
-    // ✅ v1beta에서 이미지 입력이 되는 유일한 안정 모델
+    // ✅ v1beta에서 실제로 존재하는 모델 이름
     const model = genAI.getGenerativeModel({
-      model: "models/gemini-1.5-flash-latest",
+      model: "gemini-1.5-flash",
     });
 
     const result = await model.generateContent([
